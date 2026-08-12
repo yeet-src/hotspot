@@ -10,3 +10,8 @@
 
 # kernel-matrix run output (build/kernel-matrix.sh)
 /.kmatrix/
+
+# compiled demo workloads (make demo) — the .c files are the source of truth
+/demo/*
+!/demo/*.c
+!/demo/README.md
