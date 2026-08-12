@@ -1,8 +1,10 @@
 // CPU sampling profiler: a `perf_event` program armed at a fixed frequency
-// (~99 Hz per CPU, scoped to one process via cgroup + this pid filter). On
-// each tick it captures the user call stack and streams it; the JS side
-// symbolizes the leaf frame (ips[0]) through the process maps and folds it
-// into a flat self-time profile.
+// (499 Hz per CPU by default, scoped to one process via cgroup + this pid
+// filter). On each tick it captures the interrupted PC plus the user call
+// stack and streams both; the JS side splits the PC on the sign bit,
+// symbolizes each half (kallsyms for kernel, process maps for user) and folds
+// the samples into a flat self-time profile, an icicle flamegraph, and a
+// timeline.
 #include "vmlinux.h"
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_tracing.h>

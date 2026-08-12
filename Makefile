@@ -61,7 +61,32 @@ postgen: | vendored-git
 		echo "warning: no git available (vendored or host); skipping 'git init'" >&2; \
 	fi
 
-clean: clean-bpf
+# Demo workloads: synthetic CPU burners with deliberately shaped call graphs,
+# so there is something worth profiling on an idle box (and something worth
+# recording). Built with the HOST compiler, not the BPF toolchain — these are
+# ordinary userspace programs, unrelated to bin/probe.bpf.o.
+#
+# -O0 -fno-omit-frame-pointer is load-bearing twice over: bpf_get_stack walks
+# frame pointers, and un-inlined functions are what keep their names on screen.
+# -g puts file:line on each row, which is what `--repo` linking hangs off.
+# See demo/README.md for what each one shows and how to record it.
+DEMO_SRCS := $(wildcard demo/*.c)
+DEMO_BINS := $(patsubst demo/%.c,demo/%,$(DEMO_SRCS))
+DEMO_CFLAGS := -O0 -g -fno-omit-frame-pointer -Wall
+
+.PHONY: demo
+demo: $(DEMO_BINS)
+
+# patterns.c needs -lm for sin(); linking it unconditionally is harmless.
+demo/%: demo/%.c
+	@command -v $(CC) >/dev/null 2>&1 || { echo "error: no host C compiler ($(CC)) — install gcc or clang"; exit 1; }
+	$(CC) $(DEMO_CFLAGS) -o $@ $< -lm
+
+clean: clean-bpf clean-demo
 	rm -rf node_modules dist src/index.jsx
+
+.PHONY: clean-demo
+clean-demo:
+	rm -rf $(DEMO_BINS) $(addsuffix .dSYM,$(DEMO_BINS))
 
 .PHONY: all bundle clean postgen
