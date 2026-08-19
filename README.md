@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <img src="assets/hotspot.gif" alt="hotspot: picking a process from the live table, then a flame graph with a per-frame hover tooltip" width="820">
+  <img src="assets/hotspot.gif" alt="hotspot: a live flame graph of bash under a 499 Hz cgroup-scoped sampler, then the same profile as a flat self-time table with kernel frames tinted purple" width="820">
 </p>
 
 **`hotspot` is an eBPF sampling CPU profiler for Linux: pick a process out of a live table, click it, and watch a flat self-time profile build in real time with user and kernel frames side by side.**
@@ -163,29 +163,15 @@ The mental model for what `hotspot` measures, and what that does and doesn't tel
 
 Two screens. The process table:
 
-```
- hotspot · 214 processes   click/⏎ profile · r refresh · q quit
-    1041  cafe             /home/dev/hotspot/demo/cafe
-     892  containerd       /usr/bin/containerd
-    1518  node             /usr/lib/node_modules/.bin/node
-     734  postgres         /usr/lib/postgresql/16/bin/postgres
-       1  systemd          /usr/lib/systemd/systemd
-```
+<p align="center">
+  <img src="assets/hotspot-process.gif" alt="hotspot's process table: every process with an executable, sorted by name, with pid, command and path columns; arrowing down moves the highlighted row" width="820">
+</p>
 
 Then the flat profile, once you open one:
 
-```
- cafe (1041) · sampling 499 Hz (cgroup)   ←/esc back · f flame · t stream · q quit
-   %              samples  ● function     · 4,812 samples · 63 pcs symbolized
-  31.4% ██████████████    1511  ● toil
-  18.2% ████████           876  ● steam_milk
-  12.7% █████▌             611  ● knead_dough
-   9.1% ████               438  ● grind_beans
-   6.3% ██▊                303  ● tamp_layer
-   4.8% ██▏                231  ● __arch_clear_user            kernel
-   2.1% ▉                  101  ● ??
- ● cafe  ● libc.so.6  ● kernel
-```
+<p align="center">
+  <img src="assets/hotspot-flat-profile.gif" alt="hotspot's flat profile of postgres: self-time rows sorted hottest first with percentage, heat bar and sample count, kernel frames tinted purple, and an object legend along the bottom" width="820">
+</p>
 
 The **header** carries the target, the sampler's state (`arming sampler…`, `sampling 499 Hz (cgroup)`, or a probe error), and the keys for this view. The **status line** repeats the column layout and the running totals: cumulative samples and how many distinct PCs have been named so far. The **table** is one row per function, self-time only, hottest first. The **legend row** at the bottom keys the colored dots to the object each function lives in.
 
