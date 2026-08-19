@@ -27,7 +27,7 @@ The thing you would otherwise reach for is `perf record` followed by `perf repor
 ## Questions this tool answers
 
 **One process is pinning a core and I need to know which function, right now.**
-`yeet run gh:yeet-src/hotspot --tty`, click the process, and read the top of the table. Rows are self-time only, sorted hottest first, so the top row is where the CPU actually is rather than a caller that merely contains it. The first rows land in about a second at the default 499 Hz. See [What you're looking at](#what-youre-looking-at).
+`yeet run gh:yeet-src/hotspot`, click the process, and read the top of the table. Rows are self-time only, sorted hottest first, so the top row is where the CPU actually is rather than a caller that merely contains it. The first rows land in about a second at the default 499 Hz. See [What you're looking at](#what-youre-looking-at).
 
 **I'm SSHed into a box where I can't install `perf` and there's no matching `linux-tools` package. Can I still profile?**
 Yes, and this is the case the shape is for. `perf` needs a `linux-tools` build matched to the running kernel, which is exactly what a minimal or slightly-behind image doesn't have. `hotspot` needs the yeet daemon and this script; the sampler is a CO-RE BPF program, so there's no per-kernel recompile and nothing to match. It draws in the terminal you're already in, so there's also no port to forward.
@@ -72,8 +72,8 @@ Not directly. `hotspot` is a mouse-driven TUI with no headless mode and no `--js
 ## Quick start
 
 ```sh
-curl -fsSL https://yeet.cx | sh                 # install yeet, once
-yeet run gh:yeet-src/hotspot --tty              # clone, build and run in one step
+curl -fsSL https://yeet.cx | sh   # install yeet, once
+yeet run gh:yeet-src/hotspot      # clone, build and run in one step
 ```
 [Manual install guide](https://yeet.cx/docs/install/manual-installation?utm_source=github&utm_medium=readme&utm_campaign=hotspot) | Linux only
 
@@ -86,13 +86,13 @@ Working on the script itself instead of just running it? Clone it and build in p
 
 ```sh
 git clone https://github.com/yeet-src/hotspot && cd hotspot
-make              # compile bin/probe.bpf.o + bundle the JS (toolchain auto-fetched)
-yeet run . --tty  # the live process table; click a process to profile it
+make         # compile bin/probe.bpf.o + bundle the JS (toolchain auto-fetched)
+yeet run .   # the live process table; click a process to profile it
 ```
 
 With no flags you land on the process table: every process with an executable, sorted by name. Kernel threads are filtered out because they have no `exe` and no user stacks. Click a row to select it, click the selected row (or `⏎`) to start profiling, and the pane becomes a live profile. No sampling happens until you open a process.
 
-Script flags go **after `--`** so the runtime routes them to the script rather than consuming them itself, which is the most common first-run mistake. Note that `--tty` is a flag to `yeet run` itself and therefore goes *before* the `--`.
+Script flags go **after `--`** so the runtime routes them to the script rather than consuming them itself, which is the most common first-run mistake. Flags belonging to `yeet run` itself (`--quiet`, `--watch`, and so on) go *before* the `--`.
 
 | flag | default | meaning |
 | --- | --- | --- |
@@ -103,9 +103,9 @@ Script flags go **after `--`** so the runtime routes them to the script rather t
 
 ```sh
 R=gh:yeet-src/hotspot
-yeet run $R --tty -- --freq 997                        # sample harder
-yeet run $R --tty -- --repo torvalds/linux --rev v6.12 # link kernel rows to a tag
-yeet run $R --tty -- --repo me/svc --strip /build/src/ # bridge a container build path
+yeet run $R -- --freq 997                        # sample harder
+yeet run $R -- --repo torvalds/linux --rev v6.12 # link kernel rows to a tag
+yeet run $R -- --repo me/svc --strip /build/src/ # bridge a container build path
 ```
 
 (From a clone, `.` replaces `gh:yeet-src/hotspot` in any of these.)
@@ -126,7 +126,7 @@ Read AGENTS.md first, then:
    something to show on an idle box:
      make demo
      ./demo/cafe &
-4. Run: yeet run . --tty
+4. Run: yeet run .
 5. Navigate to the `cafe` process with the arrow keys and press Enter.
    Confirm that within a few seconds you see rows with real function names
    (toil, grind_beans, steam_milk, tamp_layer) and non-zero sample counts.
@@ -229,7 +229,7 @@ The **stream view** (`t`) is a live flame chart where x is time: one column per 
 When the target binary carries DWARF, each row knows the `file:line` of its **hottest** PC, meaning the hottest line inside the function rather than its declaration. Pass `--repo` and those become clickable links:
 
 ```sh
-yeet run . --tty -- --repo me/service --rev deploy-2026-08-01
+yeet run . -- --repo me/service --rev deploy-2026-08-01
 ```
 
 Function names then paint as OSC 8 hyperlinks (ctrl or cmd-click in most terminals), and `o` copies the selected row's URL to your clipboard via OSC 52.
@@ -334,7 +334,7 @@ An idle box makes a boring profiler. `demo/` holds two synthetic CPU burners who
 ```sh
 make demo
 ./demo/cafe &        # or ./demo/patterns
-yeet run . --tty     # click `cafe` in the process list
+yeet run .   # click `cafe` in the process list
 ```
 
 `cafe` simulates a café rotating through three shifts every four seconds, each burning CPU in its own call subtree, with a twelve-frame recursive tower in the espresso machine. It's the better single take: three distinct subtrees in flame mode and four-second bands sliding past in stream mode.
@@ -378,7 +378,7 @@ There's no capture script; [`demo/README.md`](demo/README.md) has the recording 
 That is a clone-authentication failure, not a script problem. `gh:` shorthand tries SSH first
 (`git@github.com:yeet-src/hotspot`) so private repos work with your own keys, then retries over
 HTTPS. If neither has a usable credential you get this. Check `ssh -T git@github.com` succeeds,
-or clone it yourself and run `yeet run . --tty` from the directory.
+or clone it yourself and run `yeet run .` from the directory.
 
 **Why is the top row `??` with a spinner that never resolves?**
 A spinner means queued, and a spinner that persists means the batch failed rather than that it's slow. The status line shows `sym: <error>` when symbolization errored; the most common cause is the process exiting while being profiled, since the resolver reads its live maps. Reopen the process.

@@ -5,9 +5,9 @@ idle box. Both are built for recording: their call graphs are designed so the
 flame view has structure and the stream view has motion.
 
 ```sh
-make demo          # builds demo/cafe and demo/patterns
-./demo/cafe        # in one shell
-yeet run . --tty   # in another: click `cafe` in the process list
+make demo    # builds demo/cafe and demo/patterns
+./demo/cafe  # in one shell
+yeet run .   # in another: click `cafe` in the process list
 ```
 
 Both are built `-O0 -g`: the stack walk needs frame pointers, and the whole
@@ -54,7 +54,7 @@ that produces a readable GIF:
 make demo
 ./demo/cafe &                     # or ./demo/patterns
 # resize the terminal to ~100x30, then record:
-yeet run . --tty
+yeet run .
 ```
 
 A tour that fits in ~20 seconds, in the order that reads best:
