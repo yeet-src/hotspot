@@ -17,6 +17,13 @@
 
 **`hotspot` is an eBPF sampling CPU profiler for Linux: pick a process out of a live table, click it, and watch a flat self-time profile build in real time with user and kernel frames side by side.**
 
+## Quick start
+
+```sh
+curl -fsSL https://yeet.cx | sh   # install yeet, once
+yeet run gh:yeet-src/hotspot      # clone, build and run in one step
+```
+
 It samples where the CPU actually was, so a function that shows up hot is hot because the instruction pointer kept landing in it, not because a counter said so. User and kernel frames arrive on the same footing: a process stuck in `__arch_clear_user` reads exactly like one stuck in its own hot loop, which is what tells you whether the problem is your code or the syscall it keeps making.
 
 The thing you would otherwise reach for is `perf record` followed by `perf report`, or a language-specific profiler like `py-spy` or `async-profiler`. `perf` means installing `linux-tools` matched to the running kernel, capturing to a file, then post-processing it, and a language profiler only sees one runtime. `hotspot` needs no matching package, no capture file and no post-processing step, and it profiles whatever the process is written in because it reads the instruction pointer rather than a runtime's own introspection.
@@ -24,52 +31,17 @@ The thing you would otherwise reach for is `perf record` followed by `perf repor
 > [!TIP]
 > **No `perf` install, no capture file, no post-processing.** `hotspot` arms a `perf_event` BPF program at 499 Hz per CPU scoped to the process's cgroup, and symbolizes each sampled address through the live process maps daemon-side. Nothing is written to disk, and the profile is on screen while the process is still running.
 
-## Questions this tool answers
-
-**One process is pinning a core and I need to know which function, right now.**
-`yeet run gh:yeet-src/hotspot`, click the process, and read the top of the table. Rows are self-time only, sorted hottest first, so the top row is where the CPU actually is rather than a caller that merely contains it. The first rows land in about a second at the default 499 Hz. See [What you're looking at](#what-youre-looking-at).
-
-**I'm SSHed into a box where I can't install `perf` and there's no matching `linux-tools` package. Can I still profile?**
-Yes, and this is the case the shape is for. `perf` needs a `linux-tools` build matched to the running kernel, which is exactly what a minimal or slightly-behind image doesn't have. `hotspot` needs the yeet daemon and this script; the sampler is a CO-RE BPF program, so there's no per-kernel recompile and nothing to match. It draws in the terminal you're already in, so there's also no port to forward.
-
-**Is the time going into my code or into the kernel?**
-That's the split the profile is built around. Each sample records the interrupted program counter, and PCs divide on the sign bit: kernel addresses resolve through kallsyms, user addresses through the process maps. Kernel rows are tinted and labeled `kernel`, so a syscall-bound process is visually obvious. `dd if=/dev/zero of=/dev/null` shows `__arch_clear_user` on top with `el0_svc` and `vfs_read` trailing; a busy interpreter shows its own eval loop instead.
-
-**The hot work is on a worker thread, not the main thread. Will I see it?**
-Yes. The sampler attaches to the process's **cgroup** rather than to a single pid, so worker pools, thread pools and runtime helper threads are all covered; attaching per-thread would race thread churn and miss anything spawned after you looked. An in-kernel `target_pid` filter keeps cgroup siblings out, so you get the whole process and only that process.
-
-**I want a flame graph but I don't want to generate an SVG and open a browser.**
-Press `f`. The flame view is an icicle graph rendered in the terminal, folded from the same samples, with hover tooltips showing inclusive samples, self time, fan-out and stack depth for the frame under the cursor. `⏎` zooms into a subtree, `esc` backs out. Press `t` instead for a timeline where the x-axis is wall-clock time, which is the view that shows a workload changing phase. See [Navigation](#navigation).
-
-**Everything says `??` instead of function names. What's wrong?**
-Usually nothing is broken; the symbols genuinely aren't there. A `??` row means the PC landed somewhere the symbol tables don't name: between exported symbols in a stripped distro library (glibc's `_int_malloc`, IFUNC `memcpy` variants), or in a JIT region with no perf map. Installing the debug package (`apt install libc6-dbg`) names the first kind, because the resolver reaches past `.dynsym` into build-id debug files. A row that shows `??` with a spinner is still in flight rather than unresolved.
-
-**Can I jump from a hot row to the source line on GitHub?**
-Yes, when the binary carries DWARF. Run with `--repo org/repo` and each row's function name becomes an OSC 8 hyperlink to its hottest line, not the declaration. `o` copies the link to your clipboard through the terminal. `--rev` picks the branch or SHA and `--strip` bridges a build path that doesn't match the repo tree. See [Linking rows to GitHub](#linking-rows-to-github).
-
-**Does sampling a process slow it down?**
-The sampler fires 499 times a second per CPU and each tick writes one record: the interrupted PC plus up to 48 stack frames. The frequency is fixed and does not scale with how busy the process is, so the cost is bounded by CPU count rather than by workload. 499 is prime deliberately, so sampling never phase-locks with kernel ticks (100/250/300/1000 Hz) or round application timers, which would otherwise bias the profile toward whatever happens to run at those phases.
-
-**Is this a replacement for Datadog Profiler, Pyroscope, or Parca?**
-No. `hotspot` is one process on one host, live, with no retention, no history and no fleet view. Close it and the profile is gone; there's no continuous profiling, no comparison between deploys, and no flame graph you can link a colleague to. It's for the ten minutes where you need to know what a specific process is doing right now, which is when a continuous profiler's aggregated view is least specific. Run both.
-
-**When should I use this instead of `perf top`, `py-spy`, or a language profiler?**
-Reach for `hotspot` when you want to point at a process and get a live user-plus-kernel profile without installing anything matched to the kernel. Reach for `perf` when you need call-graph recording to a file, hardware PMU events (cache misses, branch mispredicts), or the enormous surrounding toolchain; `hotspot` samples `cpu_clock` only. Reach for `py-spy`, `async-profiler` or an equivalent when you need interpreter-level or JIT-aware frames: those tools understand a runtime's own stack representation, and a native sampler shows you the interpreter's C frames instead. For memory rather than CPU, that's a different question entirely.
-
-**Can I run this in CI, or have an agent read the output?**
-Not directly. `hotspot` is a mouse-driven TUI with no headless mode and no `--json`. See [Reading it without a TTY](#reading-it-without-a-tty) for what's actually available and what it would take to add.
-
 ## Contents
 
-**Run it** — [Quick start](#quick-start) · [Have an agent set it up](#have-an-agent-set-it-up) · [Without a TTY](#reading-it-without-a-tty) · [Demo workloads](#try-it-without-a-real-workload)
+**Run it** — [Get started](#get-started) · [Have an agent set it up](#have-an-agent-set-it-up) · [Without a TTY](#reading-it-without-a-tty) · [Demo workloads](#try-it-without-a-real-workload)
 
-**Understand it** — [Questions this tool answers](#questions-this-tool-answers) · [A 60-second primer](#a-60-second-primer-on-sampling-profilers) · [What you're looking at](#what-youre-looking-at) · [How it works](#how-it-works) · [What it can't see](#what-it-cant-see)
+**Understand it** — [A 60-second primer](#a-60-second-primer-on-sampling-profilers) · [Questions this tool answers](#questions-this-tool-answers) · [What you're looking at](#what-youre-looking-at) · [How it works](#how-it-works) · [What it can't see](#what-it-cant-see)
 
 **Reference** — [Navigation](#navigation) · [Linking rows to GitHub](#linking-rows-to-github) · [Requirements](#requirements) · [FAQ](#faq) · [License](#license)
 
 **Contribute** — [Building from source](#building-from-source) · [Testing across kernels](#testing-across-kernels)
 
-## Quick start
+## Get started
 
 ```sh
 curl -fsSL https://yeet.cx | sh   # install yeet, once
@@ -145,7 +117,7 @@ bug — which is why step 5 profiles the demo workload (built -O0 -g) rather
 than a random system process.
 ```
 
-Prefer to drive it yourself? [Quick start](#quick-start) is three lines.
+Prefer to drive it yourself? [Get started](#get-started) is three lines.
 
 ## A 60-second primer on sampling profilers
 
@@ -158,6 +130,41 @@ The mental model for what `hotspot` measures, and what that does and doesn't tel
 **On-CPU only.** A sampling profiler sees a process when it's running. Time spent blocked (waiting on I/O, a lock, or the scheduler) produces no samples at all, because the CPU is off doing something else. A process that's slow because it's waiting will look nearly idle here, which is the limit everything in [What it can't see](#what-it-cant-see) follows from.
 
 **Addresses, then names.** The kernel ships raw program counters; naming them is a separate step against symbol tables. That's why names can lag a moment behind counts, and why a stripped binary yields `??`: the sample is real, the name just isn't recoverable.
+
+## Questions this tool answers
+
+**One process is pinning a core and I need to know which function, right now.**
+`yeet run gh:yeet-src/hotspot`, click the process, and read the top of the table. Rows are self-time only, sorted hottest first, so the top row is where the CPU actually is rather than a caller that merely contains it. The first rows land in about a second at the default 499 Hz. See [What you're looking at](#what-youre-looking-at).
+
+**I'm SSHed into a box where I can't install `perf` and there's no matching `linux-tools` package. Can I still profile?**
+Yes, and this is the case the shape is for. `perf` needs a `linux-tools` build matched to the running kernel, which is exactly what a minimal or slightly-behind image doesn't have. `hotspot` needs the yeet daemon and this script; the sampler is a CO-RE BPF program, so there's no per-kernel recompile and nothing to match. It draws in the terminal you're already in, so there's also no port to forward.
+
+**Is the time going into my code or into the kernel?**
+That's the split the profile is built around. Each sample records the interrupted program counter, and PCs divide on the sign bit: kernel addresses resolve through kallsyms, user addresses through the process maps. Kernel rows are tinted and labeled `kernel`, so a syscall-bound process is visually obvious. `dd if=/dev/zero of=/dev/null` shows `__arch_clear_user` on top with `el0_svc` and `vfs_read` trailing; a busy interpreter shows its own eval loop instead.
+
+**The hot work is on a worker thread, not the main thread. Will I see it?**
+Yes. The sampler attaches to the process's **cgroup** rather than to a single pid, so worker pools, thread pools and runtime helper threads are all covered; attaching per-thread would race thread churn and miss anything spawned after you looked. An in-kernel `target_pid` filter keeps cgroup siblings out, so you get the whole process and only that process.
+
+**I want a flame graph but I don't want to generate an SVG and open a browser.**
+Press `f`. The flame view is an icicle graph rendered in the terminal, folded from the same samples, with hover tooltips showing inclusive samples, self time, fan-out and stack depth for the frame under the cursor. `⏎` zooms into a subtree, `esc` backs out. Press `t` instead for a timeline where the x-axis is wall-clock time, which is the view that shows a workload changing phase. See [Navigation](#navigation).
+
+**Everything says `??` instead of function names. What's wrong?**
+Usually nothing is broken; the symbols genuinely aren't there. A `??` row means the PC landed somewhere the symbol tables don't name: between exported symbols in a stripped distro library (glibc's `_int_malloc`, IFUNC `memcpy` variants), or in a JIT region with no perf map. Installing the debug package (`apt install libc6-dbg`) names the first kind, because the resolver reaches past `.dynsym` into build-id debug files. A row that shows `??` with a spinner is still in flight rather than unresolved.
+
+**Can I jump from a hot row to the source line on GitHub?**
+Yes, when the binary carries DWARF. Run with `--repo org/repo` and each row's function name becomes an OSC 8 hyperlink to its hottest line, not the declaration. `o` copies the link to your clipboard through the terminal. `--rev` picks the branch or SHA and `--strip` bridges a build path that doesn't match the repo tree. See [Linking rows to GitHub](#linking-rows-to-github).
+
+**Does sampling a process slow it down?**
+The sampler fires 499 times a second per CPU and each tick writes one record: the interrupted PC plus up to 48 stack frames. The frequency is fixed and does not scale with how busy the process is, so the cost is bounded by CPU count rather than by workload. 499 is prime deliberately, so sampling never phase-locks with kernel ticks (100/250/300/1000 Hz) or round application timers, which would otherwise bias the profile toward whatever happens to run at those phases.
+
+**Is this a replacement for Datadog Profiler, Pyroscope, or Parca?**
+No. `hotspot` is one process on one host, live, with no retention, no history and no fleet view. Close it and the profile is gone; there's no continuous profiling, no comparison between deploys, and no flame graph you can link a colleague to. It's for the ten minutes where you need to know what a specific process is doing right now, which is when a continuous profiler's aggregated view is least specific. Run both.
+
+**When should I use this instead of `perf top`, `py-spy`, or a language profiler?**
+Reach for `hotspot` when you want to point at a process and get a live user-plus-kernel profile without installing anything matched to the kernel. Reach for `perf` when you need call-graph recording to a file, hardware PMU events (cache misses, branch mispredicts), or the enormous surrounding toolchain; `hotspot` samples `cpu_clock` only. Reach for `py-spy`, `async-profiler` or an equivalent when you need interpreter-level or JIT-aware frames: those tools understand a runtime's own stack representation, and a native sampler shows you the interpreter's C frames instead. For memory rather than CPU, that's a different question entirely.
+
+**Can I run this in CI, or have an agent read the output?**
+Not directly. `hotspot` is a mouse-driven TUI with no headless mode and no `--json`. See [Reading it without a TTY](#reading-it-without-a-tty) for what's actually available and what it would take to add.
 
 ## What you're looking at
 
