@@ -117,7 +117,7 @@ bug — which is why step 5 profiles the demo workload (built -O0 -g) rather
 than a random system process.
 ```
 
-Prefer to drive it yourself? [Get started](#get-started) is three lines.
+Prefer to drive it yourself? [Get started](#get-started) is two commands.
 
 ## A 60-second primer on sampling profilers
 
