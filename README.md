@@ -7,7 +7,7 @@
   <a href="https://yeet.cx/docs/?utm_source=github&utm_medium=readme&utm_campaign=hotspot&utm_content=badge"><img src="https://img.shields.io/badge/built%20with-yeet%20%2B%20eBPF-8A2BE2" alt="Built with yeet, a JS runtime for eBPF"></a>
   <a href="#the-bpf-side"><img src="https://img.shields.io/badge/hook-perf__event-FF6B35" alt="Attaches a perf_event sampler at 499 Hz per CPU"></a>
   <a href="#how-it-works"><img src="https://img.shields.io/badge/category-profiling-7C3AED" alt="Sampling CPU profiler, user and kernel stacks"></a>
-  <a href="#license"><img src="https://img.shields.io/badge/license-GPL--2.0-3DA639" alt="GPL-2.0, declared in the BPF program"></a>
+  <a href="#license"><img src="https://img.shields.io/badge/license-Apache--2.0-3DA639" alt="Apache-2.0"></a>
   <a href="https://discord.gg/JxVseaAVAU"><img src="https://img.shields.io/badge/chat-Discord-5865F2" alt="Discord: ask about yeet scripts"></a>
 </p>
 
@@ -404,7 +404,7 @@ Yes, and cgroup scoping makes it the natural case: containers *are* cgroups, so 
 
 ## License
 
-GPL-2.0.
+Apache-2.0.
 
 ---
 
